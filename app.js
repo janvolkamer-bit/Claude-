@@ -629,24 +629,34 @@
     cameraStatus.textContent = "Kamera wird gewechselt...";
     captureBtn.textContent = "Foto 2/2 aufnehmen";
 
-    // iOS braucht nach dem Stoppen der Rückkamera kurz Zeit, bis die
-    // Frontkamera-Hardware wieder frei ist - ohne Pause schlägt der
-    // nächste getUserMedia-Aufruf sonst oft fehl.
-    await sleep(500);
+    // iOS braucht nach dem Stoppen der Rückkamera Zeit, bis die
+    // Frontkamera-Hardware wieder frei ist - ohne ausreichend Pause
+    // schlägt der nächste getUserMedia-Aufruf sonst fehl. Wir warten
+    // erst lange, und falls es trotzdem fehlschlägt, nochmal länger.
+    const attempts = [1200, 2000];
 
-    try {
-      frontStream = await getCameraStream("user");
-      frontVideo.srcObject = frontStream;
-      frontVideo.classList.remove("front");
-      frontVideo.classList.add("back");
-      frontVideo.hidden = false;
-      await safePlay(frontVideo);
-      sequentialStep = "front";
-      cameraStatus.textContent = "Foto 2/2: Frontkamera - aufnehmen, wenn bereit.";
-    } catch (err) {
-      cameraStatus.textContent = "Frontkamera nicht verfügbar - nur Rückkamera-Foto wird verwendet.";
-      const canvas = bufferedBackCanvas || document.createElement("canvas");
-      finishCapture(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
+    for (let i = 0; i < attempts.length; i++) {
+      cameraStatus.textContent =
+        i === 0 ? "Kamera wird gewechselt..." : "Kamera braucht noch einen Moment...";
+      await sleep(attempts[i]);
+
+      try {
+        frontStream = await getCameraStream("user");
+        frontVideo.srcObject = frontStream;
+        frontVideo.classList.remove("front");
+        frontVideo.classList.add("back");
+        frontVideo.hidden = false;
+        await safePlay(frontVideo);
+        sequentialStep = "front";
+        cameraStatus.textContent = "Foto 2/2: Frontkamera - aufnehmen, wenn bereit.";
+        return;
+      } catch (err) {
+        if (i === attempts.length - 1) {
+          cameraStatus.textContent = "Frontkamera nicht verfügbar - nur Rückkamera-Foto wird verwendet.";
+          const canvas = bufferedBackCanvas || document.createElement("canvas");
+          finishCapture(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
+        }
+      }
     }
   }
 
