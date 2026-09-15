@@ -19,6 +19,10 @@
 
   <section class="stats-card">
     <h2>Statistik</h2>
+    <div class="field-row start-date-row">
+      <label for="startDate">Start-Datum</label>
+      <input type="date" id="startDate">
+    </div>
     <div class="stats-row">
       <div class="stat-box">
         <div class="stat-value" id="todayCount">0</div>
@@ -27,6 +31,10 @@
       <div class="stat-box">
         <div class="stat-value" id="weekCount">0</div>
         <div class="stat-label">Diese Woche</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="streakDaysCount">0</div>
+        <div class="stat-label" id="streakDaysLabel">Trinktage seit Start</div>
       </div>
     </div>
     <div class="chart-row" id="weekChart"></div>

@@ -89,32 +89,42 @@ main {
   font-size: 1.1rem;
 }
 
+.start-date-row {
+  margin-bottom: 14px;
+}
+
+.start-date-row input {
+  max-width: 200px;
+}
+
 .stats-row {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 16px;
 }
 
 .stat-box {
   flex: 1;
+  min-width: 0;
   text-align: center;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px 8px;
+  padding: 12px 6px;
 }
 
 .stat-value {
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   font-weight: 700;
   color: var(--accent-dark);
   line-height: 1;
 }
 
 .stat-label {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
   margin-top: 4px;
+  overflow-wrap: break-word;
 }
 
 .chart-row {

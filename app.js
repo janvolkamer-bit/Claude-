@@ -2,6 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "biercounter.entries";
+  const START_DATE_KEY = "biercounter.startDate";
   const MAX_PHOTO_DIMENSION = 800;
   const PHOTO_QUALITY = 0.7;
 
@@ -20,6 +21,9 @@
   const todayCountEl = document.getElementById("todayCount");
   const weekCountEl = document.getElementById("weekCount");
   const weekChartEl = document.getElementById("weekChart");
+  const startDateInput = document.getElementById("startDate");
+  const streakDaysCountEl = document.getElementById("streakDaysCount");
+  const streakDaysLabelEl = document.getElementById("streakDaysLabel");
 
   const RESET_CONFIRM_WORD = "LÖSCHEN";
   const WEEKDAY_LABELS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
@@ -37,6 +41,31 @@
 
   function saveEntries(entries) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }
+
+  function loadStartDate() {
+    return localStorage.getItem(START_DATE_KEY);
+  }
+
+  function saveStartDate(dateKey) {
+    localStorage.setItem(START_DATE_KEY, dateKey);
+  }
+
+  function ensureStartDate(entries) {
+    let startDate = loadStartDate();
+    if (startDate) return startDate;
+
+    if (entries.length > 0) {
+      const earliest = entries.reduce(
+        (min, e) => (e.timestamp < min ? e.timestamp : min),
+        entries[0].timestamp
+      );
+      startDate = localDateKey(new Date(earliest));
+    } else {
+      startDate = localDateKey(new Date());
+    }
+    saveStartDate(startDate);
+    return startDate;
   }
 
   function formatTimestamp(iso) {
@@ -69,6 +98,8 @@
     const now = new Date();
     const todayKey = localDateKey(now);
     const weekStart = startOfWeek(now);
+    const startDate = ensureStartDate(entries);
+    startDateInput.value = startDate;
 
     let todayTotal = 0;
     let weekTotal = 0;
@@ -85,6 +116,13 @@
 
     todayCountEl.textContent = String(todayTotal);
     weekCountEl.textContent = String(weekTotal);
+
+    const drinkingDays = Array.from(byDay.keys()).filter((key) => key >= startDate).length;
+    const elapsedDays =
+      Math.round((new Date(todayKey) - new Date(startDate)) / 86400000) + 1;
+    streakDaysCountEl.textContent = String(drinkingDays);
+    streakDaysLabelEl.textContent = "Trinktage seit Start";
+    streakDaysLabelEl.title = `${drinkingDays} von ${Math.max(elapsedDays, drinkingDays)} Tagen seit ${startDate}`;
 
     const days = [];
     for (let i = 6; i >= 0; i--) {
@@ -244,6 +282,15 @@
     photoInput.value = "";
     photoPreview.hidden = true;
     clearPhotoBtn.hidden = true;
+  });
+
+  startDateInput.addEventListener("change", () => {
+    if (!startDateInput.value) {
+      startDateInput.value = loadStartDate();
+      return;
+    }
+    saveStartDate(startDateInput.value);
+    render();
   });
 
   decBtn.addEventListener("click", () => {
