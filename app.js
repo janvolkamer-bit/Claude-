@@ -475,6 +475,12 @@
 
   addForm.addEventListener("submit", (e) => {
     e.preventDefault();
+
+    if (!pendingPhoto) {
+      alert("Bitte zuerst ein Foto aufnehmen oder auswählen.");
+      return;
+    }
+
     const amount = Math.max(1, parseInt(amountInput.value, 10) || 1);
     const note = noteInput.value.trim();
     const drink = drinkInput.value.trim() || "Bier";
