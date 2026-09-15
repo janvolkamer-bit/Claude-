@@ -17,6 +17,12 @@
   const historyList = document.getElementById("historyList");
   const emptyState = document.getElementById("emptyState");
   const resetBtn = document.getElementById("resetBtn");
+  const todayCountEl = document.getElementById("todayCount");
+  const weekCountEl = document.getElementById("weekCount");
+  const weekChartEl = document.getElementById("weekChart");
+
+  const RESET_CONFIRM_WORD = "LÖSCHEN";
+  const WEEKDAY_LABELS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
   let pendingPhoto = null;
 
@@ -44,10 +50,84 @@
     });
   }
 
+  function localDateKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function startOfWeek(date) {
+    const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const day = start.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    start.setDate(start.getDate() + diffToMonday);
+    return start;
+  }
+
+  function renderStats(entries) {
+    const now = new Date();
+    const todayKey = localDateKey(now);
+    const weekStart = startOfWeek(now);
+
+    let todayTotal = 0;
+    let weekTotal = 0;
+    const byDay = new Map();
+
+    entries.forEach((entry) => {
+      const entryDate = new Date(entry.timestamp);
+      const key = localDateKey(entryDate);
+      byDay.set(key, (byDay.get(key) || 0) + entry.amount);
+
+      if (key === todayKey) todayTotal += entry.amount;
+      if (entryDate >= weekStart) weekTotal += entry.amount;
+    });
+
+    todayCountEl.textContent = String(todayTotal);
+    weekCountEl.textContent = String(weekTotal);
+
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      days.push(d);
+    }
+    const maxAmount = Math.max(1, ...days.map((d) => byDay.get(localDateKey(d)) || 0));
+
+    weekChartEl.innerHTML = "";
+    days.forEach((d) => {
+      const key = localDateKey(d);
+      const amount = byDay.get(key) || 0;
+      const isToday = key === todayKey;
+
+      const bar = document.createElement("div");
+      bar.className = "chart-bar" + (isToday ? " is-today" : "");
+
+      const countEl = document.createElement("div");
+      countEl.className = "chart-bar-count";
+      countEl.textContent = amount > 0 ? String(amount) : "";
+      bar.appendChild(countEl);
+
+      const fill = document.createElement("div");
+      fill.className = "chart-bar-fill";
+      const heightPct = Math.max(4, Math.round((amount / maxAmount) * 100));
+      fill.style.height = `${heightPct}%`;
+      bar.appendChild(fill);
+
+      const labelEl = document.createElement("div");
+      labelEl.className = "chart-bar-label";
+      labelEl.textContent = WEEKDAY_LABELS[d.getDay()];
+      bar.appendChild(labelEl);
+
+      weekChartEl.appendChild(bar);
+    });
+  }
+
   function render() {
     const entries = loadEntries();
     const total = entries.reduce((sum, e) => sum + e.amount, 0);
     totalCountEl.textContent = String(total);
+    renderStats(entries);
 
     historyList.innerHTML = "";
     emptyState.hidden = entries.length > 0;
@@ -206,10 +286,16 @@
   });
 
   resetBtn.addEventListener("click", () => {
-    if (confirm("Wirklich alle Einträge unwiderruflich löschen?")) {
-      saveEntries([]);
-      render();
+    const input = prompt(
+      `Das löscht ALLE Einträge unwiderruflich.\nTippe "${RESET_CONFIRM_WORD}" ein, um zu bestätigen:`
+    );
+    if (input === null) return;
+    if (input.trim().toUpperCase() !== RESET_CONFIRM_WORD) {
+      alert("Abgebrochen: Bestätigungswort stimmte nicht überein.");
+      return;
     }
+    saveEntries([]);
+    render();
   });
 
   render();
