@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Biercounter</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="app-header">
+  <h1>🍺 Biercounter</h1>
+</header>
+
+<main>
+  <section class="counter-card">
+    <div class="counter-value" id="totalCount">0</div>
+    <div class="counter-label">Biere insgesamt</div>
+  </section>
+
+  <section class="add-card">
+    <h2>Bier eintragen</h2>
+    <form id="addForm">
+      <div class="field-row">
+        <label for="amount">Anzahl</label>
+        <div class="stepper">
+          <button type="button" id="decBtn" aria-label="Weniger">−</button>
+          <input type="number" id="amount" min="1" value="1" inputmode="numeric">
+          <button type="button" id="incBtn" aria-label="Mehr">+</button>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <label for="note">Notiz (optional)</label>
+        <input type="text" id="note" placeholder="z. B. Kneipe, Sorte, Anlass...">
+      </div>
+
+      <div class="field-row">
+        <label for="photo">Foto (optional)</label>
+        <input type="file" id="photo" accept="image/*" capture="environment">
+        <img id="photoPreview" class="photo-preview" hidden>
+        <button type="button" id="clearPhotoBtn" class="link-btn" hidden>Foto entfernen</button>
+      </div>
+
+      <button type="submit" class="primary-btn">🍺 Bier eintragen</button>
+    </form>
+  </section>
+
+  <section class="history-card">
+    <div class="history-header">
+      <h2>Verlauf</h2>
+      <button type="button" id="resetBtn" class="link-btn danger">Alles löschen</button>
+    </div>
+    <ul id="historyList" class="history-list"></ul>
+    <p id="emptyState" class="empty-state">Noch keine Einträge. Prost! 🍻</p>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
