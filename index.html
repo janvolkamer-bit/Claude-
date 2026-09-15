@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Biercounter</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -71,6 +72,14 @@
       </div>
 
       <div class="field-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="locationToggle" checked>
+          📍 Standort speichern
+        </label>
+        <span id="locationStatus" class="location-status">Standort wird ermittelt...</span>
+      </div>
+
+      <div class="field-row">
         <label for="photo">Foto</label>
         <div class="photo-buttons">
           <input type="file" id="photo" accept="image/*">
@@ -118,6 +127,13 @@
     <div id="galleryGrid" class="gallery-grid"></div>
     <p id="galleryEmptyState" class="empty-state">Noch keine Fotos vorhanden.</p>
   </section>
+
+  <section class="map-card">
+    <h2>Karte</h2>
+    <p class="map-hint">Größere Punkte = häufiger besuchte Orte.</p>
+    <div id="map"></div>
+    <p id="mapEmptyState" class="empty-state">Noch keine Standorte gespeichert.</p>
+  </section>
 </main>
 
 <div id="cameraModal" class="camera-modal" hidden>
@@ -140,6 +156,7 @@
   <div id="lightboxCaption" class="lightbox-caption"></div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="app.js"></script>
 </body>
 </html>

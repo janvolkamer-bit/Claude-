@@ -282,6 +282,27 @@ input[type="file"] {
   gap: 8px;
 }
 
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  width: 18px;
+  height: 18px;
+}
+
+.location-status {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .secondary-btn {
   padding: 10px;
   font-size: 0.9rem;
@@ -447,6 +468,37 @@ input[type="file"] {
   background: rgba(255, 255, 255, 0.85);
   border-radius: 999px;
   padding: 1px 6px;
+}
+
+/* Map */
+.map-hint {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin: -6px 0 12px;
+}
+
+#map {
+  height: 280px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.map-popup {
+  font-size: 0.85rem;
+  color: #201a12;
+}
+
+.map-popup img {
+  width: 100%;
+  max-width: 160px;
+  border-radius: 8px;
+  margin-top: 6px;
+  display: block;
+}
+
+.map-popup strong {
+  color: var(--accent-dark);
 }
 
 /* Dual-camera modal */

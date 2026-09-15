@@ -50,6 +50,11 @@
   const captureBtn = document.getElementById("captureBtn");
   const cancelCameraBtn = document.getElementById("cancelCameraBtn");
 
+  const locationToggle = document.getElementById("locationToggle");
+  const locationStatusEl = document.getElementById("locationStatus");
+  const mapEl = document.getElementById("map");
+  const mapEmptyState = document.getElementById("mapEmptyState");
+
   const RESET_CONFIRM_WORD = "LÖSCHEN";
   const WEEKDAY_LABELS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
   const DEFAULT_DRINKS = ["Bier", "Radler", "Wein", "Sekt", "Cocktail", "Wasser", "Limo"];
@@ -57,6 +62,9 @@
   const MAX_DRINK_CHIPS = 8;
 
   let pendingPhoto = null;
+  let currentPosition = null;
+  let leafletMap = null;
+  let mapMarkersLayer = null;
 
   function loadEntries() {
     try {
@@ -320,6 +328,101 @@
     lightboxImg.src = "";
   }
 
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function requestLocation() {
+    if (!navigator.geolocation) {
+      locationStatusEl.textContent = "Standort wird von diesem Browser nicht unterstützt.";
+      return;
+    }
+    locationStatusEl.textContent = "Standort wird ermittelt...";
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        currentPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        locationStatusEl.textContent = "📍 Standort ermittelt.";
+      },
+      () => {
+        currentPosition = null;
+        locationStatusEl.textContent = "Standort nicht verfügbar (Zugriff verweigert oder Fehler).";
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 5 * 60 * 1000 }
+    );
+  }
+
+  locationToggle.addEventListener("change", () => {
+    if (locationToggle.checked) {
+      requestLocation();
+    } else {
+      locationStatusEl.textContent = "Standort wird nicht gespeichert.";
+    }
+  });
+
+  function ensureMap() {
+    if (leafletMap) return;
+    leafletMap = L.map(mapEl);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 19,
+    }).addTo(leafletMap);
+    mapMarkersLayer = L.layerGroup().addTo(leafletMap);
+  }
+
+  function renderMap(entries) {
+    const withLocation = entries.filter((e) => e.location);
+    mapEmptyState.hidden = withLocation.length > 0;
+    mapEl.hidden = withLocation.length === 0;
+
+    if (withLocation.length === 0) return;
+
+    ensureMap();
+    mapMarkersLayer.clearLayers();
+
+    const spots = new Map();
+    withLocation.forEach((entry) => {
+      const key = `${entry.location.lat.toFixed(3)},${entry.location.lng.toFixed(3)}`;
+      if (!spots.has(key)) spots.set(key, { lat: entry.location.lat, lng: entry.location.lng, entries: [] });
+      spots.get(key).entries.push(entry);
+    });
+
+    const bounds = [];
+    spots.forEach((spot) => {
+      const totalAmount = spot.entries.reduce((sum, e) => sum + e.amount, 0);
+      const radius = Math.min(9 + totalAmount * 2, 28);
+      const latest = spot.entries.slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+
+      const marker = L.circleMarker([spot.lat, spot.lng], {
+        radius,
+        color: "#b5701a",
+        weight: 2,
+        fillColor: "#d98c2b",
+        fillOpacity: 0.75,
+      });
+
+      const drinkLabel = latest.size ? `${latest.drink || "Bier"} (${latest.size})` : latest.drink || "Bier";
+      const popupHtml = `
+        <div class="map-popup">
+          <strong>${totalAmount}x</strong> an diesem Ort (${spot.entries.length} ${spot.entries.length === 1 ? "Eintrag" : "Einträge"})<br>
+          Zuletzt: ${escapeHtml(drinkLabel)} · ${escapeHtml(formatTimestamp(latest.timestamp))}
+          ${latest.photo ? `<img src="${latest.photo}" alt="Foto">` : ""}
+        </div>
+      `;
+      marker.bindPopup(popupHtml);
+      marker.addTo(mapMarkersLayer);
+      bounds.push([spot.lat, spot.lng]);
+    });
+
+    if (bounds.length === 1) {
+      leafletMap.setView(bounds[0], 14);
+    } else {
+      leafletMap.fitBounds(bounds, { padding: [30, 30] });
+    }
+    setTimeout(() => leafletMap.invalidateSize(), 150);
+  }
+
   function render() {
     const entries = loadEntries();
     const total = entries.reduce((sum, e) => sum + e.amount, 0);
@@ -329,6 +432,7 @@
     renderDrinkChips(entries);
     renderSizeChips();
     renderGallery(entries);
+    renderMap(entries);
 
     historyList.innerHTML = "";
     emptyState.hidden = entries.length > 0;
@@ -485,6 +589,7 @@
     const note = noteInput.value.trim();
     const drink = drinkInput.value.trim() || "Bier";
     const size = sizeInput.value || "";
+    const location = locationToggle.checked && currentPosition ? currentPosition : null;
 
     const entries = loadEntries();
     entries.push({
@@ -494,6 +599,7 @@
       size,
       note,
       photo: pendingPhoto,
+      location,
       timestamp: new Date().toISOString(),
     });
 
@@ -747,5 +853,6 @@
     render();
   });
 
+  if (locationToggle.checked) requestLocation();
   render();
 })();
