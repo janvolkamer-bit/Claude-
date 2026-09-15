@@ -46,7 +46,6 @@
   const cameraModal = document.getElementById("cameraModal");
   const backVideo = document.getElementById("backVideo");
   const frontVideo = document.getElementById("frontVideo");
-  const captureCanvas = document.getElementById("captureCanvas");
   const cameraStatus = document.getElementById("cameraStatus");
   const captureBtn = document.getElementById("captureBtn");
   const cancelCameraBtn = document.getElementById("cancelCameraBtn");
@@ -58,7 +57,6 @@
   const MAX_DRINK_CHIPS = 8;
 
   let pendingPhoto = null;
-  let cameraStreams = [];
 
   function loadEntries() {
     try {
@@ -526,9 +524,24 @@
     if (e.target === lightbox) closeLightbox();
   });
 
+  const CAPTURE_WIDTH = 900;
+  const CAPTURE_HEIGHT = Math.round(CAPTURE_WIDTH * (4 / 3));
+
+  let backStream = null;
+  let frontStream = null;
+  let cameraMode = null; // "simultaneous" | "sequential"
+  let sequentialStep = null; // "back" | "front"
+  let bufferedBackCanvas = null;
+
+  function stopStream(stream) {
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+  }
+
   function stopCameraStreams() {
-    cameraStreams.forEach((stream) => stream.getTracks().forEach((track) => track.stop()));
-    cameraStreams = [];
+    stopStream(backStream);
+    stopStream(frontStream);
+    backStream = null;
+    frontStream = null;
     backVideo.srcObject = null;
     frontVideo.srcObject = null;
   }
@@ -537,7 +550,90 @@
     stopCameraStreams();
     cameraModal.hidden = true;
     captureBtn.hidden = true;
+    backVideo.hidden = false;
     frontVideo.hidden = false;
+    frontVideo.classList.remove("back");
+    frontVideo.classList.add("front");
+    cameraMode = null;
+    sequentialStep = null;
+    bufferedBackCanvas = null;
+  }
+
+  function drawFrameToCanvas(video) {
+    const canvas = document.createElement("canvas");
+    canvas.width = CAPTURE_WIDTH;
+    canvas.height = CAPTURE_HEIGHT;
+    canvas.getContext("2d").drawImage(video, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
+    return canvas;
+  }
+
+  function drawPipOverlay(ctx, source) {
+    const pipWidth = Math.round(CAPTURE_WIDTH * 0.3);
+    const pipHeight = Math.round(pipWidth * (4 / 3));
+    const margin = 14;
+    ctx.save();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 4;
+    ctx.drawImage(source, CAPTURE_WIDTH - pipWidth - margin, margin, pipWidth, pipHeight);
+    ctx.strokeRect(CAPTURE_WIDTH - pipWidth - margin, margin, pipWidth, pipHeight);
+    ctx.restore();
+  }
+
+  function finishCapture(dataUrl) {
+    pendingPhoto = dataUrl;
+    photoPreview.src = pendingPhoto;
+    photoPreview.hidden = false;
+    clearPhotoBtn.hidden = false;
+    closeCameraModal();
+  }
+
+  async function startSequentialFrontStep() {
+    if (backVideo.videoWidth) {
+      bufferedBackCanvas = drawFrameToCanvas(backVideo);
+    }
+    stopStream(backStream);
+    backStream = null;
+    backVideo.srcObject = null;
+    backVideo.hidden = true;
+
+    cameraStatus.textContent = "Foto 2/2: Frontkamera - aufnehmen, wenn bereit.";
+    captureBtn.textContent = "Foto 2/2 aufnehmen";
+
+    try {
+      frontStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "user" } },
+        audio: false,
+      });
+      frontVideo.srcObject = frontStream;
+      frontVideo.classList.remove("front");
+      frontVideo.classList.add("back");
+      frontVideo.hidden = false;
+      sequentialStep = "front";
+    } catch (err) {
+      cameraStatus.textContent = "Frontkamera nicht verfügbar - nur Rückkamera-Foto wird verwendet.";
+      const canvas = bufferedBackCanvas || document.createElement("canvas");
+      finishCapture(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
+    }
+  }
+
+  function finishSequentialCapture() {
+    const canvas = document.createElement("canvas");
+    canvas.width = CAPTURE_WIDTH;
+    canvas.height = CAPTURE_HEIGHT;
+    const ctx = canvas.getContext("2d");
+    if (bufferedBackCanvas) ctx.drawImage(bufferedBackCanvas, 0, 0);
+    if (frontVideo.videoWidth) drawPipOverlay(ctx, frontVideo);
+    finishCapture(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
+  }
+
+  function captureSimultaneous() {
+    const canvas = document.createElement("canvas");
+    canvas.width = CAPTURE_WIDTH;
+    canvas.height = CAPTURE_HEIGHT;
+    const ctx = canvas.getContext("2d");
+    if (backVideo.videoWidth) ctx.drawImage(backVideo, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
+    if (frontVideo.videoWidth) drawPipOverlay(ctx, frontVideo);
+    finishCapture(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
   }
 
   async function openCameraModal() {
@@ -549,31 +645,34 @@
 
     cameraModal.hidden = false;
     captureBtn.hidden = true;
-    cameraStatus.textContent = "Kameras werden gestartet...";
+    captureBtn.textContent = "Foto aufnehmen";
+    cameraStatus.textContent = "Kamera wird gestartet...";
 
     try {
-      const backStream = await navigator.mediaDevices.getUserMedia({
+      backStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
         audio: false,
       });
       backVideo.srcObject = backStream;
-      cameraStreams.push(backStream);
 
       try {
-        const frontStream = await navigator.mediaDevices.getUserMedia({
+        frontStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "user" } },
           audio: false,
         });
         frontVideo.srcObject = frontStream;
-        cameraStreams.push(frontStream);
         frontVideo.hidden = false;
+        cameraMode = "simultaneous";
         cameraStatus.textContent = "Beide Kameras aktiv. Foto aufnehmen, wenn bereit.";
       } catch (frontErr) {
         // Viele Geräte/Browser (v. a. iOS Safari) erlauben nur eine aktive
-        // Kamera gleichzeitig. Wir machen dann mit nur der Rückkamera weiter.
+        // Kamera gleichzeitig - wir nehmen dann beide Fotos kurz nacheinander auf.
         frontVideo.hidden = true;
+        cameraMode = "sequential";
+        sequentialStep = "back";
+        captureBtn.textContent = "Foto 1/2 aufnehmen";
         cameraStatus.textContent =
-          "Dein Gerät erlaubt nur eine Kamera gleichzeitig - es wird nur die Hauptkamera genutzt.";
+          "Dein Gerät erlaubt nur eine Kamera gleichzeitig - Foto 1/2: Rückkamera, aufnehmen wenn bereit.";
       }
 
       captureBtn.hidden = false;
@@ -588,44 +687,21 @@
     }
   }
 
-  function captureFromCameras() {
-    const width = 900;
-    const height = Math.round(width * (4 / 3));
-    captureCanvas.width = width;
-    captureCanvas.height = height;
-    const ctx = captureCanvas.getContext("2d");
-
-    if (backVideo.videoWidth) {
-      ctx.drawImage(backVideo, 0, 0, width, height);
+  function handleCaptureClick() {
+    if (cameraMode === "simultaneous") {
+      captureSimultaneous();
+    } else if (cameraMode === "sequential" && sequentialStep === "back") {
+      captureBtn.hidden = true;
+      startSequentialFrontStep().finally(() => {
+        captureBtn.hidden = false;
+      });
+    } else if (cameraMode === "sequential" && sequentialStep === "front") {
+      finishSequentialCapture();
     }
-
-    if (!frontVideo.hidden && frontVideo.videoWidth) {
-      const pipWidth = Math.round(width * 0.3);
-      const pipHeight = Math.round(pipWidth * (4 / 3));
-      const margin = 14;
-      ctx.save();
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 4;
-      ctx.drawImage(
-        frontVideo,
-        width - pipWidth - margin,
-        margin,
-        pipWidth,
-        pipHeight
-      );
-      ctx.strokeRect(width - pipWidth - margin, margin, pipWidth, pipHeight);
-      ctx.restore();
-    }
-
-    pendingPhoto = captureCanvas.toDataURL("image/jpeg", PHOTO_QUALITY);
-    photoPreview.src = pendingPhoto;
-    photoPreview.hidden = false;
-    clearPhotoBtn.hidden = false;
-    closeCameraModal();
   }
 
   dualCameraBtn.addEventListener("click", openCameraModal);
-  captureBtn.addEventListener("click", captureFromCameras);
+  captureBtn.addEventListener("click", handleCaptureClick);
   cancelCameraBtn.addEventListener("click", closeCameraModal);
 
   resetBtn.addEventListener("click", () => {
