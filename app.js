@@ -537,6 +537,30 @@
     if (stream) stream.getTracks().forEach((track) => track.stop());
   }
 
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function safePlay(video) {
+    try {
+      await video.play();
+    } catch (e) {
+      // Autoplay kann von iOS blockiert werden, ist hier aber unkritisch -
+      // wir zeichnen ohnehin erst, sobald videoWidth > 0 ist.
+    }
+  }
+
+  function getCameraStream(facingMode, timeoutMs = 8000) {
+    const request = navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: facingMode } },
+      audio: false,
+    });
+    const timeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Kamera-Zeitüberschreitung")), timeoutMs);
+    });
+    return Promise.race([request, timeout]);
+  }
+
   function stopCameraStreams() {
     stopStream(backStream);
     stopStream(frontStream);
@@ -596,19 +620,23 @@
     backVideo.srcObject = null;
     backVideo.hidden = true;
 
-    cameraStatus.textContent = "Foto 2/2: Frontkamera - aufnehmen, wenn bereit.";
+    cameraStatus.textContent = "Kamera wird gewechselt...";
     captureBtn.textContent = "Foto 2/2 aufnehmen";
 
+    // iOS braucht nach dem Stoppen der Rückkamera kurz Zeit, bis die
+    // Frontkamera-Hardware wieder frei ist - ohne Pause schlägt der
+    // nächste getUserMedia-Aufruf sonst oft fehl.
+    await sleep(500);
+
     try {
-      frontStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "user" } },
-        audio: false,
-      });
+      frontStream = await getCameraStream("user");
       frontVideo.srcObject = frontStream;
       frontVideo.classList.remove("front");
       frontVideo.classList.add("back");
       frontVideo.hidden = false;
+      await safePlay(frontVideo);
       sequentialStep = "front";
+      cameraStatus.textContent = "Foto 2/2: Frontkamera - aufnehmen, wenn bereit.";
     } catch (err) {
       cameraStatus.textContent = "Frontkamera nicht verfügbar - nur Rückkamera-Foto wird verwendet.";
       const canvas = bufferedBackCanvas || document.createElement("canvas");
@@ -649,19 +677,15 @@
     cameraStatus.textContent = "Kamera wird gestartet...";
 
     try {
-      backStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false,
-      });
+      backStream = await getCameraStream("environment");
       backVideo.srcObject = backStream;
+      await safePlay(backVideo);
 
       try {
-        frontStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "user" } },
-          audio: false,
-        });
+        frontStream = await getCameraStream("user");
         frontVideo.srcObject = frontStream;
         frontVideo.hidden = false;
+        await safePlay(frontVideo);
         cameraMode = "simultaneous";
         cameraStatus.textContent = "Beide Kameras aktiv. Foto aufnehmen, wenn bereit.";
       } catch (frontErr) {
