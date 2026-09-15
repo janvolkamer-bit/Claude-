@@ -570,7 +570,8 @@ input[type="file"] {
   width: 100%;
 }
 
-.camera-modal-actions .primary-btn {
+.camera-modal-actions .primary-btn,
+.camera-modal-actions .secondary-btn {
   width: 100%;
 }
 

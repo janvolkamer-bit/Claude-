@@ -49,6 +49,7 @@
   const cameraStatus = document.getElementById("cameraStatus");
   const captureBtn = document.getElementById("captureBtn");
   const cancelCameraBtn = document.getElementById("cancelCameraBtn");
+  const cameraFallbackBtn = document.getElementById("cameraFallbackBtn");
 
   const locationToggle = document.getElementById("locationToggle");
   const locationStatusEl = document.getElementById("locationStatus");
@@ -682,6 +683,7 @@
     stopCameraStreams();
     cameraModal.hidden = true;
     captureBtn.hidden = true;
+    cameraFallbackBtn.hidden = true;
     backVideo.hidden = false;
     frontVideo.hidden = false;
     frontVideo.classList.remove("back");
@@ -771,14 +773,17 @@
 
   async function openCameraModal() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert("Dein Browser unterstützt keinen Kamerazugriff. Bitte normales Foto verwenden.");
-      photoInput.click();
+      cameraModal.hidden = false;
+      captureBtn.hidden = true;
+      cameraFallbackBtn.hidden = false;
+      cameraStatus.textContent = "Dein Browser unterstützt keinen Kamerazugriff.";
       return;
     }
 
     cameraModal.hidden = false;
     captureBtn.hidden = true;
     captureBtn.textContent = "Foto aufnehmen";
+    cameraFallbackBtn.hidden = true;
     cameraStatus.textContent = "Kamera wird gestartet...";
 
     try {
@@ -807,12 +812,10 @@
       captureBtn.hidden = false;
     } catch (err) {
       cameraStatus.textContent =
-        "Kamerazugriff nicht möglich. Bitte stattdessen ein normales Foto auswählen.";
+        "Kamerazugriff nicht möglich (evtl. in den iPhone-Einstellungen blockiert). Bitte stattdessen ein normales Foto auswählen.";
       stopCameraStreams();
-      setTimeout(() => {
-        closeCameraModal();
-        photoInput.click();
-      }, 1800);
+      captureBtn.hidden = true;
+      cameraFallbackBtn.hidden = false;
     }
   }
 
@@ -839,6 +842,10 @@
   dualCameraBtn.addEventListener("click", openCameraModal);
   captureBtn.addEventListener("click", handleCaptureClick);
   cancelCameraBtn.addEventListener("click", closeCameraModal);
+  cameraFallbackBtn.addEventListener("click", () => {
+    closeCameraModal();
+    photoInput.click();
+  });
 
   resetBtn.addEventListener("click", () => {
     const input = prompt(
