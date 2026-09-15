@@ -44,18 +44,25 @@
     <h2>Bier eintragen</h2>
     <form id="addForm">
       <div class="field-row">
+        <label>Getränk</label>
+        <div class="chip-row" id="drinkChips"></div>
+        <input type="text" id="drink" list="drinkOptions" placeholder="oder eigenes Getränk eintippen..." value="Bier">
+        <datalist id="drinkOptions"></datalist>
+      </div>
+
+      <div class="field-row">
+        <label>Größe</label>
+        <div class="chip-row" id="sizeChips"></div>
+        <input type="hidden" id="sizeInput" value="0,5l">
+      </div>
+
+      <div class="field-row">
         <label for="amount">Anzahl</label>
         <div class="stepper">
           <button type="button" id="decBtn" aria-label="Weniger">−</button>
           <input type="number" id="amount" min="1" value="1" inputmode="numeric">
           <button type="button" id="incBtn" aria-label="Mehr">+</button>
         </div>
-      </div>
-
-      <div class="field-row">
-        <label for="drink">Getränk</label>
-        <input type="text" id="drink" list="drinkOptions" placeholder="z. B. Bier, Radler, Wein..." value="Bier">
-        <datalist id="drinkOptions"></datalist>
       </div>
 
       <div class="field-row">

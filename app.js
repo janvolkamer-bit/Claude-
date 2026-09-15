@@ -13,6 +13,9 @@
   const incBtn = document.getElementById("incBtn");
   const drinkInput = document.getElementById("drink");
   const drinkOptionsEl = document.getElementById("drinkOptions");
+  const drinkChipsEl = document.getElementById("drinkChips");
+  const sizeChipsEl = document.getElementById("sizeChips");
+  const sizeInput = document.getElementById("sizeInput");
   const noteInput = document.getElementById("note");
   const photoInput = document.getElementById("photo");
   const photoPreview = document.getElementById("photoPreview");
@@ -51,6 +54,8 @@
   const RESET_CONFIRM_WORD = "LÖSCHEN";
   const WEEKDAY_LABELS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
   const DEFAULT_DRINKS = ["Bier", "Radler", "Wein", "Sekt", "Cocktail", "Wasser", "Limo"];
+  const DEFAULT_SIZES = ["0,2l", "0,3l", "0,33l", "0,5l", "1,0l"];
+  const MAX_DRINK_CHIPS = 8;
 
   let pendingPhoto = null;
   let cameraStreams = [];
@@ -194,6 +199,54 @@
     return Array.from(set).sort((a, b) => a.localeCompare(b, "de"));
   }
 
+  function getFrequentDrinks(entries) {
+    const counts = new Map();
+    entries.forEach((e) => {
+      const drink = e.drink || "Bier";
+      counts.set(drink, (counts.get(drink) || 0) + 1);
+    });
+
+    const used = Array.from(counts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "de"));
+    const result = used.map(([drink]) => drink);
+
+    DEFAULT_DRINKS.forEach((drink) => {
+      if (!result.includes(drink)) result.push(drink);
+    });
+
+    return result.slice(0, MAX_DRINK_CHIPS);
+  }
+
+  function renderDrinkChips(entries) {
+    const chips = getFrequentDrinks(entries);
+    drinkChipsEl.innerHTML = "";
+    chips.forEach((drink) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip" + (drinkInput.value === drink ? " is-active" : "");
+      btn.textContent = drink;
+      btn.addEventListener("click", () => {
+        drinkInput.value = drink;
+        renderDrinkChips(entries);
+      });
+      drinkChipsEl.appendChild(btn);
+    });
+  }
+
+  function renderSizeChips() {
+    sizeChipsEl.innerHTML = "";
+    DEFAULT_SIZES.forEach((size) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip" + (sizeInput.value === size ? " is-active" : "");
+      btn.textContent = size;
+      btn.addEventListener("click", () => {
+        sizeInput.value = size;
+        renderSizeChips();
+      });
+      sizeChipsEl.appendChild(btn);
+    });
+  }
+
   function renderDrinkOptions(entries) {
     const drinks = getDistinctDrinks(entries);
 
@@ -259,7 +312,8 @@
 
   function openLightbox(entry) {
     lightboxImg.src = entry.photo;
-    lightboxCaption.textContent = `${entry.amount}x ${entry.drink || "Bier"} · ${formatTimestamp(entry.timestamp)}${entry.note ? " · " + entry.note : ""}`;
+    const drinkLabel = entry.size ? `${entry.drink || "Bier"} (${entry.size})` : entry.drink || "Bier";
+    lightboxCaption.textContent = `${entry.amount}x ${drinkLabel} · ${formatTimestamp(entry.timestamp)}${entry.note ? " · " + entry.note : ""}`;
     lightbox.hidden = false;
   }
 
@@ -274,6 +328,8 @@
     totalCountEl.textContent = String(total);
     renderStats(entries);
     renderDrinkOptions(entries);
+    renderDrinkChips(entries);
+    renderSizeChips();
     renderGallery(entries);
 
     historyList.innerHTML = "";
@@ -307,7 +363,7 @@
         amountEl.textContent = `${entry.amount}x`;
         const drinkBadge = document.createElement("span");
         drinkBadge.className = "history-item-drink";
-        drinkBadge.textContent = unit;
+        drinkBadge.textContent = entry.size ? `${unit} · ${entry.size}` : unit;
         amountEl.appendChild(drinkBadge);
         info.appendChild(amountEl);
 
@@ -372,6 +428,8 @@
     });
   }
 
+  drinkInput.addEventListener("input", () => renderDrinkChips(loadEntries()));
+
   photoInput.addEventListener("change", async () => {
     const file = photoInput.files[0];
     if (!file) {
@@ -422,12 +480,14 @@
     const amount = Math.max(1, parseInt(amountInput.value, 10) || 1);
     const note = noteInput.value.trim();
     const drink = drinkInput.value.trim() || "Bier";
+    const size = sizeInput.value || "";
 
     const entries = loadEntries();
     entries.push({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       amount,
       drink,
+      size,
       note,
       photo: pendingPhoto,
       timestamp: new Date().toISOString(),
@@ -443,6 +503,7 @@
     addForm.reset();
     amountInput.value = 1;
     drinkInput.value = "Bier";
+    sizeInput.value = "0,5l";
     pendingPhoto = null;
     photoPreview.hidden = true;
     clearPhotoBtn.hidden = true;

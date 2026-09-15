@@ -194,6 +194,30 @@ input[type="file"] {
   padding: 8px;
 }
 
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.chip.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #201a12;
+  font-weight: 600;
+}
+
 .stepper {
   display: flex;
   align-items: center;
