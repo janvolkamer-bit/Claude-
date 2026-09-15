@@ -543,10 +543,6 @@
     if (stream) stream.getTracks().forEach((track) => track.stop());
   }
 
-  function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
   async function safePlay(video) {
     try {
       await video.play();
@@ -617,7 +613,7 @@
     closeCameraModal();
   }
 
-  async function startSequentialFrontStep() {
+  function bufferBackFrameAndStop() {
     if (backVideo.videoWidth) {
       bufferedBackCanvas = drawFrameToCanvas(backVideo);
     }
@@ -625,38 +621,25 @@
     backStream = null;
     backVideo.srcObject = null;
     backVideo.hidden = true;
+  }
 
-    cameraStatus.textContent = "Kamera wird gewechselt...";
-    captureBtn.textContent = "Foto 2/2 aufnehmen";
+  async function startFrontCamera() {
+    cameraStatus.textContent = "Frontkamera wird gestartet...";
 
-    // iOS braucht nach dem Stoppen der Rückkamera Zeit, bis die
-    // Frontkamera-Hardware wieder frei ist - ohne ausreichend Pause
-    // schlägt der nächste getUserMedia-Aufruf sonst fehl. Wir warten
-    // erst lange, und falls es trotzdem fehlschlägt, nochmal länger.
-    const attempts = [1200, 2000];
-
-    for (let i = 0; i < attempts.length; i++) {
-      cameraStatus.textContent =
-        i === 0 ? "Kamera wird gewechselt..." : "Kamera braucht noch einen Moment...";
-      await sleep(attempts[i]);
-
-      try {
-        frontStream = await getCameraStream("user");
-        frontVideo.srcObject = frontStream;
-        frontVideo.classList.remove("front");
-        frontVideo.classList.add("back");
-        frontVideo.hidden = false;
-        await safePlay(frontVideo);
-        sequentialStep = "front";
-        cameraStatus.textContent = "Foto 2/2: Frontkamera - aufnehmen, wenn bereit.";
-        return;
-      } catch (err) {
-        if (i === attempts.length - 1) {
-          cameraStatus.textContent = "Frontkamera nicht verfügbar - nur Rückkamera-Foto wird verwendet.";
-          const canvas = bufferedBackCanvas || document.createElement("canvas");
-          finishCapture(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
-        }
-      }
+    try {
+      frontStream = await getCameraStream("user");
+      frontVideo.srcObject = frontStream;
+      frontVideo.classList.remove("front");
+      frontVideo.classList.add("back");
+      frontVideo.hidden = false;
+      await safePlay(frontVideo);
+      sequentialStep = "front";
+      captureBtn.textContent = "Foto 2/2 aufnehmen";
+      cameraStatus.textContent = "Foto 2/2: Frontkamera - aufnehmen, wenn bereit.";
+    } catch (err) {
+      cameraStatus.textContent = "Frontkamera nicht verfügbar - nur Rückkamera-Foto wird verwendet.";
+      const canvas = bufferedBackCanvas || document.createElement("canvas");
+      finishCapture(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
     }
   }
 
@@ -731,8 +714,15 @@
     if (cameraMode === "simultaneous") {
       captureSimultaneous();
     } else if (cameraMode === "sequential" && sequentialStep === "back") {
+      // Foto 1 wird jetzt fest "gespeichert" (Rückkamera komplett gestoppt) -
+      // die Frontkamera startet erst nach einem weiteren, bewussten Tap.
+      bufferBackFrameAndStop();
+      sequentialStep = "confirm-front";
+      captureBtn.textContent = "Weiter zu Foto 2";
+      cameraStatus.textContent = "Foto 1 gespeichert. Tippe, wenn du bereit für die Frontkamera bist.";
+    } else if (cameraMode === "sequential" && sequentialStep === "confirm-front") {
       captureBtn.hidden = true;
-      startSequentialFrontStep().finally(() => {
+      startFrontCamera().finally(() => {
         captureBtn.hidden = false;
       });
     } else if (cameraMode === "sequential" && sequentialStep === "front") {
