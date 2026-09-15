@@ -11,6 +11,8 @@
   const amountInput = document.getElementById("amount");
   const decBtn = document.getElementById("decBtn");
   const incBtn = document.getElementById("incBtn");
+  const drinkInput = document.getElementById("drink");
+  const drinkOptionsEl = document.getElementById("drinkOptions");
   const noteInput = document.getElementById("note");
   const photoInput = document.getElementById("photo");
   const photoPreview = document.getElementById("photoPreview");
@@ -25,10 +27,33 @@
   const streakDaysCountEl = document.getElementById("streakDaysCount");
   const streakDaysLabelEl = document.getElementById("streakDaysLabel");
 
+  const galleryDrinkFilter = document.getElementById("galleryDrinkFilter");
+  const galleryDateFilter = document.getElementById("galleryDateFilter");
+  const gallerySort = document.getElementById("gallerySort");
+  const galleryResetBtn = document.getElementById("galleryResetBtn");
+  const galleryGrid = document.getElementById("galleryGrid");
+  const galleryEmptyState = document.getElementById("galleryEmptyState");
+
+  const lightbox = document.getElementById("lightbox");
+  const lightboxImg = document.getElementById("lightboxImg");
+  const lightboxCaption = document.getElementById("lightboxCaption");
+  const lightboxClose = document.getElementById("lightboxClose");
+
+  const dualCameraBtn = document.getElementById("dualCameraBtn");
+  const cameraModal = document.getElementById("cameraModal");
+  const backVideo = document.getElementById("backVideo");
+  const frontVideo = document.getElementById("frontVideo");
+  const captureCanvas = document.getElementById("captureCanvas");
+  const cameraStatus = document.getElementById("cameraStatus");
+  const captureBtn = document.getElementById("captureBtn");
+  const cancelCameraBtn = document.getElementById("cancelCameraBtn");
+
   const RESET_CONFIRM_WORD = "LÖSCHEN";
   const WEEKDAY_LABELS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const DEFAULT_DRINKS = ["Bier", "Radler", "Wein", "Sekt", "Cocktail", "Wasser", "Limo"];
 
   let pendingPhoto = null;
+  let cameraStreams = [];
 
   function loadEntries() {
     try {
@@ -161,11 +186,95 @@
     });
   }
 
+  function getDistinctDrinks(entries) {
+    const set = new Set(DEFAULT_DRINKS);
+    entries.forEach((e) => {
+      if (e.drink) set.add(e.drink);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "de"));
+  }
+
+  function renderDrinkOptions(entries) {
+    const drinks = getDistinctDrinks(entries);
+
+    drinkOptionsEl.innerHTML = "";
+    drinks.forEach((drink) => {
+      const opt = document.createElement("option");
+      opt.value = drink;
+      drinkOptionsEl.appendChild(opt);
+    });
+
+    const previousFilter = galleryDrinkFilter.value;
+    galleryDrinkFilter.innerHTML = '<option value="">Alle Getränke</option>';
+    drinks.forEach((drink) => {
+      const opt = document.createElement("option");
+      opt.value = drink;
+      opt.textContent = drink;
+      galleryDrinkFilter.appendChild(opt);
+    });
+    if (drinks.includes(previousFilter)) {
+      galleryDrinkFilter.value = previousFilter;
+    }
+  }
+
+  function renderGallery(entries) {
+    const withPhotos = entries.filter((e) => e.photo);
+    const drinkFilter = galleryDrinkFilter.value;
+    const dateFilter = galleryDateFilter.value;
+    const sortDir = gallerySort.value;
+
+    let filtered = withPhotos.filter((e) => {
+      if (drinkFilter && (e.drink || "Bier") !== drinkFilter) return false;
+      if (dateFilter && localDateKey(new Date(e.timestamp)) !== dateFilter) return false;
+      return true;
+    });
+
+    filtered = filtered.sort((a, b) => {
+      const diff = new Date(a.timestamp) - new Date(b.timestamp);
+      return sortDir === "asc" ? diff : -diff;
+    });
+
+    galleryGrid.innerHTML = "";
+    galleryEmptyState.hidden = filtered.length > 0;
+
+    filtered.forEach((entry) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "gallery-thumb";
+
+      const img = document.createElement("img");
+      img.src = entry.photo;
+      img.alt = `${entry.drink || "Bier"} am ${formatTimestamp(entry.timestamp)}`;
+      btn.appendChild(img);
+
+      const badge = document.createElement("span");
+      badge.className = "gallery-thumb-badge";
+      badge.textContent = entry.drink || "Bier";
+      btn.appendChild(badge);
+
+      btn.addEventListener("click", () => openLightbox(entry));
+      galleryGrid.appendChild(btn);
+    });
+  }
+
+  function openLightbox(entry) {
+    lightboxImg.src = entry.photo;
+    lightboxCaption.textContent = `${entry.amount}x ${entry.drink || "Bier"} · ${formatTimestamp(entry.timestamp)}${entry.note ? " · " + entry.note : ""}`;
+    lightbox.hidden = false;
+  }
+
+  function closeLightbox() {
+    lightbox.hidden = true;
+    lightboxImg.src = "";
+  }
+
   function render() {
     const entries = loadEntries();
     const total = entries.reduce((sum, e) => sum + e.amount, 0);
     totalCountEl.textContent = String(total);
     renderStats(entries);
+    renderDrinkOptions(entries);
+    renderGallery(entries);
 
     historyList.innerHTML = "";
     emptyState.hidden = entries.length > 0;
@@ -194,7 +303,12 @@
 
         const amountEl = document.createElement("div");
         amountEl.className = "history-item-amount";
-        amountEl.textContent = `${entry.amount} ${entry.amount === 1 ? "Bier" : "Biere"}`;
+        const unit = entry.drink || "Bier";
+        amountEl.textContent = `${entry.amount}x`;
+        const drinkBadge = document.createElement("span");
+        drinkBadge.className = "history-item-drink";
+        drinkBadge.textContent = unit;
+        amountEl.appendChild(drinkBadge);
         info.appendChild(amountEl);
 
         if (entry.note) {
@@ -307,11 +421,13 @@
     e.preventDefault();
     const amount = Math.max(1, parseInt(amountInput.value, 10) || 1);
     const note = noteInput.value.trim();
+    const drink = drinkInput.value.trim() || "Bier";
 
     const entries = loadEntries();
     entries.push({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       amount,
+      drink,
       note,
       photo: pendingPhoto,
       timestamp: new Date().toISOString(),
@@ -326,11 +442,130 @@
 
     addForm.reset();
     amountInput.value = 1;
+    drinkInput.value = "Bier";
     pendingPhoto = null;
     photoPreview.hidden = true;
     clearPhotoBtn.hidden = true;
     render();
   });
+
+  galleryDrinkFilter.addEventListener("change", () => renderGallery(loadEntries()));
+  galleryDateFilter.addEventListener("change", () => renderGallery(loadEntries()));
+  gallerySort.addEventListener("change", () => renderGallery(loadEntries()));
+
+  galleryResetBtn.addEventListener("click", () => {
+    galleryDrinkFilter.value = "";
+    galleryDateFilter.value = "";
+    gallerySort.value = "desc";
+    renderGallery(loadEntries());
+  });
+
+  lightboxClose.addEventListener("click", closeLightbox);
+  lightbox.addEventListener("click", (e) => {
+    if (e.target === lightbox) closeLightbox();
+  });
+
+  function stopCameraStreams() {
+    cameraStreams.forEach((stream) => stream.getTracks().forEach((track) => track.stop()));
+    cameraStreams = [];
+    backVideo.srcObject = null;
+    frontVideo.srcObject = null;
+  }
+
+  function closeCameraModal() {
+    stopCameraStreams();
+    cameraModal.hidden = true;
+    captureBtn.hidden = true;
+    frontVideo.hidden = false;
+  }
+
+  async function openCameraModal() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Dein Browser unterstützt keinen Kamerazugriff. Bitte normales Foto verwenden.");
+      photoInput.click();
+      return;
+    }
+
+    cameraModal.hidden = false;
+    captureBtn.hidden = true;
+    cameraStatus.textContent = "Kameras werden gestartet...";
+
+    try {
+      const backStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      backVideo.srcObject = backStream;
+      cameraStreams.push(backStream);
+
+      try {
+        const frontStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "user" } },
+          audio: false,
+        });
+        frontVideo.srcObject = frontStream;
+        cameraStreams.push(frontStream);
+        frontVideo.hidden = false;
+        cameraStatus.textContent = "Beide Kameras aktiv. Foto aufnehmen, wenn bereit.";
+      } catch (frontErr) {
+        // Viele Geräte/Browser (v. a. iOS Safari) erlauben nur eine aktive
+        // Kamera gleichzeitig. Wir machen dann mit nur der Rückkamera weiter.
+        frontVideo.hidden = true;
+        cameraStatus.textContent =
+          "Dein Gerät erlaubt nur eine Kamera gleichzeitig - es wird nur die Hauptkamera genutzt.";
+      }
+
+      captureBtn.hidden = false;
+    } catch (err) {
+      cameraStatus.textContent =
+        "Kamerazugriff nicht möglich. Bitte stattdessen ein normales Foto auswählen.";
+      stopCameraStreams();
+      setTimeout(() => {
+        closeCameraModal();
+        photoInput.click();
+      }, 1800);
+    }
+  }
+
+  function captureFromCameras() {
+    const width = 900;
+    const height = Math.round(width * (4 / 3));
+    captureCanvas.width = width;
+    captureCanvas.height = height;
+    const ctx = captureCanvas.getContext("2d");
+
+    if (backVideo.videoWidth) {
+      ctx.drawImage(backVideo, 0, 0, width, height);
+    }
+
+    if (!frontVideo.hidden && frontVideo.videoWidth) {
+      const pipWidth = Math.round(width * 0.3);
+      const pipHeight = Math.round(pipWidth * (4 / 3));
+      const margin = 14;
+      ctx.save();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 4;
+      ctx.drawImage(
+        frontVideo,
+        width - pipWidth - margin,
+        margin,
+        pipWidth,
+        pipHeight
+      );
+      ctx.strokeRect(width - pipWidth - margin, margin, pipWidth, pipHeight);
+      ctx.restore();
+    }
+
+    pendingPhoto = captureCanvas.toDataURL("image/jpeg", PHOTO_QUALITY);
+    photoPreview.src = pendingPhoto;
+    photoPreview.hidden = false;
+    clearPhotoBtn.hidden = false;
+    closeCameraModal();
+  }
+
+  dualCameraBtn.addEventListener("click", openCameraModal);
+  captureBtn.addEventListener("click", captureFromCameras);
+  cancelCameraBtn.addEventListener("click", closeCameraModal);
 
   resetBtn.addEventListener("click", () => {
     const input = prompt(

@@ -53,13 +53,22 @@
       </div>
 
       <div class="field-row">
+        <label for="drink">Getränk</label>
+        <input type="text" id="drink" list="drinkOptions" placeholder="z. B. Bier, Radler, Wein..." value="Bier">
+        <datalist id="drinkOptions"></datalist>
+      </div>
+
+      <div class="field-row">
         <label for="note">Notiz (optional)</label>
         <input type="text" id="note" placeholder="z. B. Kneipe, Sorte, Anlass...">
       </div>
 
       <div class="field-row">
         <label for="photo">Foto (optional)</label>
-        <input type="file" id="photo" accept="image/*" capture="environment">
+        <div class="photo-buttons">
+          <input type="file" id="photo" accept="image/*" capture="environment">
+          <button type="button" id="dualCameraBtn" class="secondary-btn">📸 Beide Kameras gleichzeitig</button>
+        </div>
         <img id="photoPreview" class="photo-preview" hidden>
         <button type="button" id="clearPhotoBtn" class="link-btn" hidden>Foto entfernen</button>
       </div>
@@ -76,7 +85,54 @@
     <ul id="historyList" class="history-list"></ul>
     <p id="emptyState" class="empty-state">Noch keine Einträge. Prost! 🍻</p>
   </section>
+
+  <section class="gallery-card">
+    <h2>Foto-Galerie</h2>
+    <div class="gallery-filters">
+      <div class="field-row">
+        <label for="galleryDrinkFilter">Getränk</label>
+        <select id="galleryDrinkFilter">
+          <option value="">Alle Getränke</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <label for="galleryDateFilter">Datum</label>
+        <input type="date" id="galleryDateFilter">
+      </div>
+      <div class="field-row">
+        <label for="gallerySort">Sortierung</label>
+        <select id="gallerySort">
+          <option value="desc">Neueste zuerst</option>
+          <option value="asc">Älteste zuerst</option>
+        </select>
+      </div>
+      <button type="button" id="galleryResetBtn" class="link-btn">Filter zurücksetzen</button>
+    </div>
+    <div id="galleryGrid" class="gallery-grid"></div>
+    <p id="galleryEmptyState" class="empty-state">Noch keine Fotos vorhanden.</p>
+  </section>
 </main>
+
+<div id="cameraModal" class="camera-modal" hidden>
+  <div class="camera-modal-inner">
+    <div class="camera-preview-wrap">
+      <video id="backVideo" class="camera-video back" autoplay playsinline muted></video>
+      <video id="frontVideo" class="camera-video front" autoplay playsinline muted></video>
+      <canvas id="captureCanvas" hidden></canvas>
+    </div>
+    <p id="cameraStatus" class="camera-status">Kameras werden gestartet...</p>
+    <div class="camera-modal-actions">
+      <button type="button" id="captureBtn" class="primary-btn" hidden>Foto aufnehmen</button>
+      <button type="button" id="cancelCameraBtn" class="link-btn">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div id="lightbox" class="lightbox" hidden>
+  <button type="button" id="lightboxClose" class="lightbox-close" aria-label="Schließen">✕</button>
+  <img id="lightboxImg" alt="Foto in groß">
+  <div id="lightboxCaption" class="lightbox-caption"></div>
+</div>
 
 <script src="app.js"></script>
 </body>
